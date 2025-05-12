@@ -67,7 +67,7 @@ def get_element_text(driver, xpath):
 def get_element_href(driver, xpath):
     """Safely get href attribute from an element"""
     try:
-        element = WebDriverWait(driver, 5).until(
+        element = WebDriverWait(driver, 2).until(
             EC.presence_of_element_located((By.XPATH, xpath))
         )
         return element.get_attribute('href')
@@ -77,7 +77,7 @@ def get_element_href(driver, xpath):
 def get_element_src(driver, xpath):
     """Safely get src attribute from an element"""
     try:
-        element = WebDriverWait(driver, 5).until(
+        element = WebDriverWait(driver, 2).until(
             EC.presence_of_element_located((By.XPATH, xpath))
         )
         return element.get_attribute('src')
@@ -117,6 +117,23 @@ def extract_listing_details(driver, url):
         print(f"Error extracting details from {url}: {str(e)}")
         return None
 
+def extract_cid_from_href(href):
+    """Extract CID from Google Business Profile href"""
+    try:
+        # Extract the ludocid parameter from the href
+        if 'ludocid=' in href:
+            cid = href.split('ludocid=')[1].split('&')[0]
+            return cid
+        return ""
+    except:
+        return ""
+
+def create_maps_url(cid):
+    """Create Google Maps URL from CID"""
+    if cid:
+        return f"https://maps.google.com/?cid={cid}"
+    return ""
+
 def get_google_reviews(driver, title, address):
     """Get reviews and GBP details from Google Business Profile"""
     try:
@@ -126,7 +143,7 @@ def get_google_reviews(driver, title, address):
         
         # Search for the business
         search_query = f"{title} {address}"
-        search_box = WebDriverWait(driver, 10).until(
+        search_box = WebDriverWait(driver, 5).until(
             EC.presence_of_element_located((By.NAME, "q"))
         )
         search_box.send_keys(search_query)
@@ -161,6 +178,26 @@ def get_google_reviews(driver, title, address):
             gbp_data['gbp_image'] = get_element_src(driver, GBP_XPATHS['gbp_image'])
         except:
             gbp_data['gbp_image'] = ""
+
+        try:
+            gbp_data['gbp_map_image'] = get_element_src(driver, GBP_XPATHS['gbp_map_image'])
+        except:
+            gbp_data['gbp_map_image'] = ""
+
+        try:
+            gbp_data['gbp_outside_image'] = get_element_src(driver, GBP_XPATHS['gbp_outside_image'])
+        except:
+            gbp_data['gbp_outside_image'] = ""
+
+        # Extract CID and create Maps URL
+        try:
+            cid_href = get_element_href(driver, GBP_XPATHS['gbp_cid_link'])
+            cid = extract_cid_from_href(cid_href)
+            gbp_data['gbp_cid'] = cid
+            gbp_data['gbp_maps_url'] = create_maps_url(cid)
+        except:
+            gbp_data['gbp_cid'] = ""
+            gbp_data['gbp_maps_url'] = ""
         
         # Click on Reviews button if present
         try:
@@ -213,7 +250,9 @@ def save_to_csv(data, filename='restoration_listings.csv'):
         'address_line1', 'address_line2', 'locality',
         'administrative_area', 'postal_code', 'country',
         'full_address', 'about', 'contact', 'description', 'website',
-        'gbp_title', 'gbp_address', 'gbp_phone', 'gbp_website', 'gbp_image',
+        'gbp_title', 'gbp_address', 'gbp_phone', 'gbp_website', 
+        'gbp_image', 'gbp_map_image', 'gbp_outside_image',
+        'gbp_cid', 'gbp_maps_url',
         'review_1', 'review_2', 'review_3', 'review_4', 'review_5'
     ]
     
@@ -245,6 +284,9 @@ def update_csv_with_reviews(driver, filename='restoration_listings.csv'):
         
         # Get reviews and GBP data
         reviews, gbp_data = get_google_reviews(driver, row['title'], row['full_address'])
+        print(reviews)
+        print(gbp_data)
+        print("__________________________________________________________________")
         
         # Add GBP data to the row
         row.update(gbp_data)
