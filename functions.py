@@ -5,7 +5,7 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import time
 import csv
 import os
-from xpaths import DETAIL_XPATHS, GBP_XPATHS
+from xpaths import DETAIL_XPATHS, GBP_XPATHS, EXTRA_FIELDS_XPATH, STANDARD_FIELDS
 
 def get_listing_urls(driver, xpath):
     """Extract all listing URLs from the current page"""
@@ -84,6 +84,36 @@ def get_element_src(driver, xpath):
     except:
         return ""
 
+def get_extra_fields(driver):
+    """Extract extra fields from the listing page"""
+    extra_fields = {}
+    try:
+        # Find all field elements
+        field_elements = driver.find_elements(By.XPATH, EXTRA_FIELDS_XPATH)
+        
+        for element in field_elements:
+            try:
+                # Get the field name (key)
+                key_element = element.find_element(By.XPATH, "./div")
+                key = key_element.text.strip()
+                
+                # Skip if it's a standard field
+                if key in STANDARD_FIELDS:
+                    continue
+                
+                # Get the field value
+                value_element = element.find_element(By.XPATH, "./div[2]")
+                value = value_element.text.strip()
+                
+                if key and value:  # Only add if both key and value exist
+                    extra_fields[key] = value
+            except:
+                continue
+                
+        return extra_fields
+    except:
+        return {}
+
 def extract_listing_details(driver, url):
     """Extract all details from a listing page"""
     try:
@@ -111,6 +141,10 @@ def extract_listing_details(driver, url):
             data['country']
         ]
         data['full_address'] = ' '.join(filter(None, address_parts))
+        
+        # Get extra fields
+        extra_fields = get_extra_fields(driver)
+        data['extra_fields'] = extra_fields
         
         return data
     except Exception as e:
@@ -193,10 +227,8 @@ def get_google_reviews(driver, title, address):
         try:
             cid_href = get_element_href(driver, GBP_XPATHS['gbp_cid_link'])
             cid = extract_cid_from_href(cid_href)
-            gbp_data['gbp_cid'] = cid
             gbp_data['gbp_maps_url'] = create_maps_url(cid)
         except:
-            gbp_data['gbp_cid'] = ""
             gbp_data['gbp_maps_url'] = ""
         
         # Click on Reviews button if present
@@ -218,10 +250,46 @@ def get_google_reviews(driver, title, address):
             )
             
             for element in review_elements[:5]:  # Get up to 5 reviews
+                # Check for 'More' link and click if present
+                try:
+                    more_link = element.find_element(By.XPATH, ".//a[text()='More']")
+                    driver.execute_script("arguments[0].click();", more_link)
+                    time.sleep(1)
+                except NoSuchElementException:
+                    pass
+
+                # Extract review text
                 reviews.append(element.text.strip())
                 
         except:
             print("No reviews found")
+
+        # Get ratings
+        ratings = []
+        try:
+            rating_elements = driver.find_elements(By.XPATH, ".//div[contains(@aria-label, 'Rated')]")
+            for element in rating_elements[:5]:  # Get up to 5 ratings
+                rating_text = element.get_attribute('aria-label')
+                rating_value = rating_text.split(' ')[1]  # Extract the rating value
+                ratings.append(rating_value)
+        except:
+            print("No ratings found")
+        
+        # Add reviews and ratings to gbp_data
+        for i in range(5):
+            gbp_data[f'review_{i+1}'] = reviews[i] if i < len(reviews) else ""
+            gbp_data[f'review_rating_{i+1}'] = ratings[i] if i < len(ratings) else ""
+        
+        # Extract embedded images
+        try:
+            image_sources = extract_embedded_images(driver)
+            gbp_data['gbp_embedded_url_1'] = image_sources[0] if len(image_sources) > 0 else ""
+            gbp_data['gbp_embedded_url_2'] = image_sources[1] if len(image_sources) > 1 else ""
+            gbp_data['gbp_embedded_url_3'] = image_sources[2] if len(image_sources) > 2 else ""
+        except:
+            gbp_data['gbp_embedded_url_1'] = ""
+            gbp_data['gbp_embedded_url_2'] = ""
+            gbp_data['gbp_embedded_url_3'] = ""
         
         return reviews, gbp_data
     except Exception as e:
@@ -252,8 +320,10 @@ def save_to_csv(data, filename='restoration_listings.csv'):
         'full_address', 'about', 'contact', 'description', 'website',
         'gbp_title', 'gbp_address', 'gbp_phone', 'gbp_website', 
         'gbp_image', 'gbp_map_image', 'gbp_outside_image',
-        'gbp_cid', 'gbp_maps_url',
-        'review_1', 'review_2', 'review_3', 'review_4', 'review_5'
+        'gbp_maps_url', 'extra_fields',
+        'review_1', 'review_2', 'review_3', 'review_4', 'review_5',
+        'review_rating_1', 'review_rating_2', 'review_rating_3', 'review_rating_4', 'review_rating_5',
+        'gbp_embedded_url_1', 'gbp_embedded_url_2', 'gbp_embedded_url_3'
     ]
     
     try:
@@ -263,6 +333,10 @@ def save_to_csv(data, filename='restoration_listings.csv'):
             # Write header if file doesn't exist
             if not file_exists:
                 writer.writeheader()
+            
+            # Convert extra_fields dictionary to string if it exists
+            if 'extra_fields' in data and isinstance(data['extra_fields'], dict):
+                data['extra_fields'] = str(data['extra_fields'])
             
             # Write data
             writer.writerow(data)
@@ -303,4 +377,37 @@ def update_csv_with_reviews(driver, filename='restoration_listings.csv'):
         save_to_csv(row, new_filename)
         
         # Add delay between requests
-        time.sleep(2) 
+        time.sleep(2)
+
+def extract_embedded_images(driver):
+    """Extract sources of the first embedded image normally and use a different XPath for the second and third images"""
+    try:
+        # Click on the initial image to open the modal
+        gbp_image = driver.find_element(By.XPATH, GBP_XPATHS['gbp_image'])
+        driver.execute_script("arguments[0].click();", gbp_image)
+        
+        # Wait for the modal to load
+        time.sleep(6)
+
+        # Find all embedded images
+        embedded_images = driver.find_elements(By.XPATH, GBP_XPATHS['embedded_images'])
+
+        # Initialize a list to store image sources
+        image_sources = []
+
+        # Get the first embedded image normally
+        if embedded_images:
+            driver.execute_script("arguments[0].click();", embedded_images[0])
+            time.sleep(2)
+            large_image = driver.find_element(By.XPATH, GBP_XPATHS['large_image'])
+            image_sources.append(large_image.get_attribute('src'))
+
+        # Use a different XPath for the second and third images
+        additional_images = driver.find_elements(By.XPATH, "//img[@data-ils=3 and @jsaction='rcuQ6b:trigger.M8vzZb']")
+        for img in additional_images[:2]:
+            image_sources.append(img.get_attribute('src'))
+
+        return image_sources
+    except Exception as e:
+        print(f"Error extracting embedded images: {str(e)}")
+        return [] 

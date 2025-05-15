@@ -8,8 +8,8 @@ BASE_URL = "https://pro.restorationindustry.org"
 # Detailed information XPaths
 DETAIL_XPATHS = {
     'title': "//h1[@class='page-header']",
-    'phone': "//div[contains(@class,'field--name-field-ams-phone')]/div[-1]",
-    'email': "//div[contains(@class,'field--name-field-ams-email')]/div[-1]",
+    'phone': "//div[contains(@class,'field--name-field-ams-phone')]/div[2]",
+    'email': "//div[contains(@class,'field--name-field-ams-email')]/div[2]",
     'organization': "//span[contains(@class,'organization')]",
     'address_line1': "//span[contains(@class,'address-line1')]",
     'address_line2': "//span[contains(@class,'address-line2')]",
@@ -17,9 +17,9 @@ DETAIL_XPATHS = {
     'administrative_area': "//span[contains(@class,'administrative-area')]",
     'postal_code': "//span[contains(@class,'postal-code')]",
     'country': "//span[contains(@class,'country')]",
-    'about': "//div[contains(@class,'field--name-field-ams-ind-company-desc')]/div[-1]",
-    'contact': "//div[contains(@class,'field--name-field-ams-master-contact')]/div[-1]",
-    'description': "//div[contains(@class, 'field--name-field-ams-description-plain')]/div[-1]",
+    'about': "//div[contains(@class,'field--name-field-ams-ind-company-desc')]/div[2]",
+    'contact': "//div[contains(@class,'field--name-field-ams-master-contact')]/div[2]",
+    'description': "//div[contains(@class, 'field--name-field-ams-description-plain')]/div[2]",
     'website': "//div[contains(@class, 'field--name-field-ams-website-url')]/div/a"
 }
 
@@ -31,8 +31,19 @@ GBP_XPATHS = {
     'gbp_address': "//div[@id='rhs']//span[@class='LrzXr']",
     'gbp_phone': "//div[@id='rhs']//span[contains(@aria-label, 'Call phone number')]",
     'gbp_website': "//div[@id='rhs']//a[@class='n1obkb mI8Pwc']",
-    'gbp_image': "//div[@class='nmrhhd luib-5']//div[./span[text()='See photos']]",
+    'gbp_image': "//div[@class='nmrhhd luib-5']//div[./span[text()='See photos']]//img",
     'gbp_map_image': "//img[contains(@alt, 'Map of')]",
     'gbp_outside_image': "//div[@class='nmrhhd luib-5']//div[.//span[text()='See outside']]//img",
-    'gbp_cid_link': "//div/span/a[contains(@href,'cid=')]"
+    'gbp_cid_link': "//div/span/a[contains(@href,'cid=')]",
+    'embedded_images': "//div[@aria-label='Photo gallery']//img[not(contains(@src, 'https://streetviewpixels'))]",
+    'large_image': "//img[contains(@jsaction,'load:trigger')]"
+}
+
+# XPath for extra fields
+EXTRA_FIELDS_XPATH = "//div[contains(@class, 'field field--name-field')]"
+
+# List of standard fields to ignore when processing extra fields
+STANDARD_FIELDS = {
+    'Contact', 'Address', 'Title', 'Website', 'Email', 
+    'Phone', 'About', 'Organization', 'Description'
 } 
