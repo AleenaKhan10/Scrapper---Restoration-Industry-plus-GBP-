@@ -10,58 +10,71 @@ def main():
     # Initialize the driver
     driver = setup_driver()
     
+    # List of URLs to process
+    urls = [
+        "https://pro.restorationindustry.org/directory-search?combine=&field_ams_geofield_proximity%5Bvalue%5D=100&field_ams_geofield_proximity%5Bsource_configuration%5D%5Borigin_address%5D=Connecticut+US%2C+United+States",
+        "https://pro.restorationindustry.org/directory-search?combine=&field_ams_geofield_proximity%5Bvalue%5D=100&field_ams_geofield_proximity%5Bsource_configuration%5D%5Borigin_address%5D=Maine+US%2C+United+States",
+        "https://pro.restorationindustry.org/directory-search?combine=&field_ams_geofield_proximity%5Bvalue%5D=100&field_ams_geofield_proximity%5Bsource_configuration%5D%5Borigin_address%5D=New+hampshire+US%2C+United+States"
+    ]
+    
     try:
-        # # Navigate to the initial URL
-        # initial_url = f"{BASE_URL}/directory-search?combine=&field_ams_geofield_proximity%5Bvalue%5D=100&field_ams_geofield_proximity%5Bsource_configuration%5D%5Borigin_address%5D=New%20York%20US%2C%20United%20States&page=0"
-        # driver.get(initial_url)
+        all_listings = []  # Store all listings data
         
-        # # Wait for initial page load
-        # time.sleep(3)
-        
-        # all_urls = []
-        # page_number = 1
-        
-        # # First, collect all URLs
-        # while True:
-        #     print(f"Scraping page {page_number}...")
+        # First phase: Collect all listings from all URLs
+        for url in urls:
+            print(f"\nProcessing URL: {url}")
+            driver.get(url)
+            time.sleep(3)
             
-        #     # Get URLs from current page
-        #     page_urls = get_listing_urls(driver, LISTING_URLS)
-        #     all_urls.extend(page_urls)
+            all_urls = []
+            page_number = 1
             
-        #     print(f"Found {len(page_urls)} URLs on page {page_number}")
-            
-        #     # Try to click next page
-        #     if not click_next_page(driver, NEXT_PAGE_BUTTON):
-        #         print("Reached last page")
-        #         break
+            # Collect URLs from current starting URL
+            while True:
+                print(f"Scraping page {page_number}...")
                 
-        #     page_number += 1
-        
-        # print(f"\nTotal URLs collected: {len(all_urls)}")
-        
-        # # Now process each URL and extract details
-        # for index, url in enumerate(all_urls, 1):
-        #     print(f"\nProcessing listing {index}/{len(all_urls)}: {url}")
+                # Get URLs from current page
+                page_urls = get_listing_urls(driver, LISTING_URLS)
+                all_urls.extend(page_urls)
+                
+                print(f"Found {len(page_urls)} URLs on page {page_number}")
+                
+                # Try to click next page
+                if not click_next_page(driver, NEXT_PAGE_BUTTON):
+                    print("Reached last page")
+                    break
+                    
+                page_number += 1
             
-        #     # Extract details from the listing
-        #     listing_data = extract_listing_details(driver, url)
+            print(f"\nTotal URLs collected from this starting URL: {len(all_urls)}")
             
-        #     if listing_data:
-        #         # Save to CSV
-        #         save_to_csv(listing_data)
-        #         print(f"Successfully saved data for {url}")
-        #     else:
-        #         print(f"Failed to extract data for {url}")
-            
-        #     # Add a small delay between requests
-        #     time.sleep(1)
+            # Process each URL and extract details
+            for index, listing_url in enumerate(all_urls, 1):
+                print(f"\nProcessing listing {index}/{len(all_urls)}: {listing_url}")
+                
+                # Extract details from the listing
+                listing_data = extract_listing_details(driver, listing_url)
+                
+                if listing_data:
+                    all_listings.append(listing_data)  # Store the data instead of saving immediately
+                    print(f"Successfully collected data for {listing_url}")
+                else:
+                    print(f"Failed to extract data for {listing_url}")
+                
+                # Add a small delay between requests
+                time.sleep(1)
         
+        # After collecting all listings, save them to CSV
+        print("\nSaving all collected listings to CSV...")
+        for listing_data in all_listings:
+            save_to_csv(listing_data)
+        print(f"Successfully saved {len(all_listings)} listings to CSV")
+        
+        # Second phase: Collect Google Business Profile reviews
         print("\nStarting Google Business Profile review collection...")
-        # Update CSV with Google reviews
         update_csv_with_reviews(driver)
         print("\nReview collection completed!")
-            
+                
     except Exception as e:
         print(f"An error occurred: {str(e)}")
     
